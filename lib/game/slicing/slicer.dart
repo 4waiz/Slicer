@@ -71,7 +71,7 @@ class MeshSlicer {
     for (var t = 0; t < mesh.triCount; t++) {
       final i = t * 9;
       final mat = mesh.triMat[t];
-      var nPos = 0, nNeg = 0;
+      var nPos = 0, nNeg = 0, nZero = 0;
       for (var k = 0; k < 3; k++) {
         final o = i + k * 3;
         vs[k].setValues(p[o], p[o + 1], p[o + 2]);
@@ -81,15 +81,38 @@ class MeshSlicer {
           nPos++;
         } else if (dist < -epsilon) {
           nNeg++;
+        } else {
+          nZero++;
         }
       }
 
-      if (nNeg == 0) {
-        front.addTriangle(vs[0], vs[1], vs[2], mat);
-        continue;
-      }
-      if (nPos == 0) {
-        back.addTriangle(vs[0], vs[1], vs[2], mat);
+      if (nNeg == 0 || nPos == 0) {
+        if (nNeg == 0) {
+          front.addTriangle(vs[0], vs[1], vs[2], mat);
+        } else {
+          back.addTriangle(vs[0], vs[1], vs[2], mat);
+        }
+        // A triangle sitting entirely on one side can still rest an edge
+        // against the plane -- that edge is part of the cut outline. Without
+        // this, a cut passing exactly through vertices (a swipe landing on a
+        // box corner) leaves the outline open and the cap never closes.
+        // Fully coplanar triangles are skipped: their edges are interior to
+        // the cut face, not boundary.
+        if (nZero == 2) {
+          var e0 = -1, e1 = -1;
+          for (var k = 0; k < 3; k++) {
+            if (d[k].abs() <= epsilon) {
+              if (e0 < 0) {
+                e0 = k;
+              } else {
+                e1 = k;
+              }
+            }
+          }
+          segA.add(vs[e0].clone());
+          segB.add(vs[e1].clone());
+          segMat.add(mat);
+        }
         continue;
       }
 
@@ -105,6 +128,9 @@ class MeshSlicer {
         final da = d[k], db = d[k2];
         if (da >= -epsilon) fPoly.add(a.clone());
         if (da <= epsilon) bPoly.add(a.clone());
+        // A vertex lying on the plane *is* a cut point; no edge crossing is
+        // generated for it, so record it explicitly.
+        if (da.abs() <= epsilon) cross.add(a.clone());
         if ((da > epsilon && db < -epsilon) || (da < -epsilon && db > epsilon)) {
           final ip = plane.intersect(a, b, da, db);
           fPoly.add(ip);
@@ -195,13 +221,19 @@ class MeshSlicer {
 
     final adjacency = <int, List<int>>{};
     final edgeMat = <(int, int), int>{};
+    final seenEdges = <(int, int)>{};
     for (var i = 0; i < a.length; i++) {
       final ia = weldOf(a[i]);
       final ib = weldOf(b[i]);
       if (ia == ib) continue;
+      final key = _edgeKey(ia, ib);
+      // An edge resting on the plane is reported by the triangles on both
+      // sides of it. Inserting it twice would give its vertices four
+      // neighbours and derail the loop walk.
+      if (!seenEdges.add(key)) continue;
       (adjacency[ia] ??= <int>[]).add(ib);
       (adjacency[ib] ??= <int>[]).add(ia);
-      edgeMat[_edgeKey(ia, ib)] = mats[i];
+      edgeMat[key] = mats[i];
     }
 
     final visited = <int>{};

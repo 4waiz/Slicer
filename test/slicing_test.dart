@@ -85,8 +85,9 @@ void main() {
       final plane = CutPlane.throughPoint(Vector3(0, 1, 0), Vector3(0, 0.6, 0));
       final r = MeshSlicer.slice(cube, plane);
       expect(r.didCut, isTrue);
-      expect(r.front!.volume, closeTo(2 * 2 * 1.4, 1e-4));
-      expect(r.back!.volume, closeTo(2 * 2 * 2.6, 1e-4));
+      // Cube spans y in [-1, 1]; the plane at y = 0.6 leaves 0.4 above it.
+      expect(r.front!.volume, closeTo(2 * 2 * 0.4, 1e-4));
+      expect(r.back!.volume, closeTo(2 * 2 * 1.6, 1e-4));
     });
 
     test('diagonal cut conserves volume and produces a larger cut face', () {
