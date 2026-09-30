@@ -105,7 +105,7 @@ class _RgbHsl {
 /// 9 floats per triangle (3 vertices x xyz), all in object space.
 class MeshData {
   MeshData(this.positions, this.triMat, this.materials)
-      : assert(positions.length == triMat.length * 9);
+    : assert(positions.length == triMat.length * 9);
 
   final Float32List positions;
   final Uint8List triMat;
@@ -124,7 +124,9 @@ class MeshData {
       return;
     }
     var minX = double.infinity, minY = double.infinity, minZ = double.infinity;
-    var maxX = -double.infinity, maxY = -double.infinity, maxZ = -double.infinity;
+    var maxX = -double.infinity,
+        maxY = -double.infinity,
+        maxZ = -double.infinity;
     for (var i = 0; i < positions.length; i += 3) {
       final x = positions[i], y = positions[i + 1], z = positions[i + 2];
       if (x < minX) minX = x;
@@ -173,8 +175,11 @@ class MeshData {
       final i = t * 9;
       final ax = positions[i], ay = positions[i + 1], az = positions[i + 2];
       final bx = positions[i + 3], by = positions[i + 4], bz = positions[i + 5];
-      final cx2 = positions[i + 6], cy2 = positions[i + 7], cz2 = positions[i + 8];
-      final v = (ax * (by * cz2 - bz * cy2) -
+      final cx2 = positions[i + 6],
+          cy2 = positions[i + 7],
+          cz2 = positions[i + 8];
+      final v =
+          (ax * (by * cz2 - bz * cy2) -
               ay * (bx * cz2 - bz * cx2) +
               az * (bx * cy2 - by * cx2)) /
           6.0;
@@ -256,8 +261,11 @@ class MeshData {
     return seen.values.toList(growable: false);
   }
 
-  static final MeshData empty =
-      MeshData(Float32List(0), Uint8List(0), const <SurfaceMaterial>[]);
+  static final MeshData empty = MeshData(
+    Float32List(0),
+    Uint8List(0),
+    const <SurfaceMaterial>[],
+  );
 }
 
 /// Growable builder used by the loader and the slicer.
@@ -285,8 +293,18 @@ class MeshBuilder {
     _mat.add(material);
   }
 
-  void addRaw(double ax, double ay, double az, double bx, double by, double bz,
-      double cx, double cy, double cz, int material) {
+  void addRaw(
+    double ax,
+    double ay,
+    double az,
+    double bx,
+    double by,
+    double bz,
+    double cx,
+    double cy,
+    double cz,
+    int material,
+  ) {
     _pos
       ..add(ax)
       ..add(ay)
@@ -307,9 +325,6 @@ class MeshBuilder {
     }
   }
 
-  MeshData build() => MeshData(
-        Float32List.fromList(_pos),
-        Uint8List.fromList(_mat),
-        materials,
-      );
+  MeshData build() =>
+      MeshData(Float32List.fromList(_pos), Uint8List.fromList(_mat), materials);
 }

@@ -20,8 +20,8 @@ class RenderNode {
     this.tintAmount = 0.0,
     this.brightness = 1.0,
     this.castShadow = true,
-  })  : position = position ?? Vector3.zero(),
-        orientation = orientation ?? Quaternion.identity();
+  }) : position = position ?? Vector3.zero(),
+       orientation = orientation ?? Quaternion.identity();
 
   MeshData mesh;
   Vector3 position;
@@ -44,7 +44,10 @@ class RenderNode {
 
   Matrix4 get modelMatrix {
     _model.setFromTranslationRotationScale(
-        position, orientation, Vector3(scale, scale, scale));
+      position,
+      orientation,
+      Vector3(scale, scale, scale),
+    );
     return _model;
   }
 }
@@ -54,10 +57,10 @@ class Lighting {
   Lighting({
     Vector3? keyDirection,
     this.keyColor = const Color(0xFFFFF4E0),
-    this.keyStrength = 0.95,
-    this.skyColor = const Color(0xFF2E6C82),
-    this.groundColor = const Color(0xFF0E2029),
-    this.ambientStrength = 0.52,
+    this.keyStrength = 0.88,
+    this.skyColor = const Color(0xFF5A9CB4),
+    this.groundColor = const Color(0xFF24505F),
+    this.ambientStrength = 0.82,
     this.rimColor = const Color(0xFF6FE8FF),
     this.rimStrength = 0.55,
     this.specStrength = 0.42,
@@ -102,6 +105,15 @@ class SceneRenderer {
   /// Triangles submitted on the most recent frame -- surfaced in the perf HUD.
   int get lastTriangleCount => _count;
 
+  /// Per-stage reject counts from the most recent frame. Diagnostic only.
+  int consideredTris = 0;
+  int culledDegenerate = 0;
+  int culledBackface = 0;
+  int culledBehind = 0;
+
+  String get cullReport =>
+      'c=$consideredTris d=$culledDegenerate b=$culledBackface z=$culledBehind';
+
   void _ensureCapacity(int tris) {
     if (_depth.length >= tris) return;
     final n = math.max(tris, math.max(1024, _depth.length * 2));
@@ -131,13 +143,29 @@ class SceneRenderer {
 
     _count = 0;
     _glowCount = 0;
+    consideredTris = 0;
+    culledDegenerate = 0;
+    culledBackface = 0;
+    culledBehind = 0;
 
-    final camX = camera.position.x, camY = camera.position.y, camZ = camera.position.z;
-    final lx = light.keyDirection.x, ly = light.keyDirection.y, lz = light.keyDirection.z;
-    final keyR = light.keyColor.r, keyG = light.keyColor.g, keyB = light.keyColor.b;
-    final skyR = light.skyColor.r, skyG = light.skyColor.g, skyB = light.skyColor.b;
-    final grR = light.groundColor.r, grG = light.groundColor.g, grB = light.groundColor.b;
-    final rimR = light.rimColor.r, rimG = light.rimColor.g, rimB = light.rimColor.b;
+    final camX = camera.position.x,
+        camY = camera.position.y,
+        camZ = camera.position.z;
+    final lx = light.keyDirection.x,
+        ly = light.keyDirection.y,
+        lz = light.keyDirection.z;
+    final keyR = light.keyColor.r,
+        keyG = light.keyColor.g,
+        keyB = light.keyColor.b;
+    final skyR = light.skyColor.r,
+        skyG = light.skyColor.g,
+        skyB = light.skyColor.b;
+    final grR = light.groundColor.r,
+        grG = light.groundColor.g,
+        grB = light.groundColor.b;
+    final rimR = light.rimColor.r,
+        rimG = light.rimColor.g,
+        rimB = light.rimColor.b;
 
     for (final node in nodes) {
       if (!node.visible || node.mesh.triCount == 0) continue;
@@ -168,6 +196,7 @@ class SceneRenderer {
 
       for (var t = 0; t < mesh.triCount; t++) {
         if (_count >= maxTriangles) break;
+        consideredTris++;
         final i = t * 9;
 
         // Object -> world.
@@ -190,7 +219,10 @@ class SceneRenderer {
         var ny = (bz - az) * (cx - ax) - (bx - ax) * (cz - az);
         var nz = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
         final nLen = math.sqrt(nx * nx + ny * ny + nz * nz);
-        if (nLen < 1e-12) continue;
+        if (nLen < 1e-12) {
+          culledDegenerate++;
+          continue;
+        }
         nx /= nLen;
         ny /= nLen;
         nz /= nLen;
@@ -201,18 +233,25 @@ class SceneRenderer {
         final ctrZ = (az + bz + cz) / 3.0;
         var vx = camX - ctrX, vy = camY - ctrY, vz = camZ - ctrZ;
         final vLen = math.sqrt(vx * vx + vy * vy + vz * vz);
-        if (vLen < 1e-9) continue;
+        if (vLen < 1e-9) {
+          culledDegenerate++;
+          continue;
+        }
         vx /= vLen;
         vy /= vLen;
         vz /= vLen;
-        if (nx * vx + ny * vy + nz * vz <= 0.0) continue;
+        if (nx * vx + ny * vy + nz * vz <= 0.0) {
+          culledBackface++;
+          continue;
+        }
 
         final d0 = camera.projectRaw(ax, ay, az, _p0);
-        if (d0 < 0) continue;
         final d1 = camera.projectRaw(bx, by, bz, _p1);
-        if (d1 < 0) continue;
         final d2 = camera.projectRaw(cx, cy, cz, _p2);
-        if (d2 < 0) continue;
+        if (d0 < 0 || d1 < 0 || d2 < 0) {
+          culledBehind++;
+          continue;
+        }
 
         // Shade.
         final mi = mesh.triMat[t];
@@ -243,9 +282,21 @@ class SceneRenderer {
 
         final baseR = mr[mi], baseG = mg[mi], baseB = mb[mi];
         final emis = me[mi];
-        var rr = baseR * (ambR + keyR * kk) + rimR * rim + baseR * emis + keyR * spec;
-        var gg = baseG * (ambG + keyG * kk) + rimG * rim + baseG * emis + keyG * spec;
-        var bb = baseB * (ambB + keyB * kk) + rimB * rim + baseB * emis + keyB * spec;
+        var rr =
+            baseR * (ambR + keyR * kk) +
+            rimR * rim +
+            baseR * emis +
+            keyR * spec;
+        var gg =
+            baseG * (ambG + keyG * kk) +
+            rimG * rim +
+            baseG * emis +
+            keyG * spec;
+        var bb =
+            baseB * (ambB + keyB * kk) +
+            rimB * rim +
+            baseB * emis +
+            keyB * spec;
 
         if (ta > 0) {
           rr = rr + (tr - rr) * ta;
@@ -253,7 +304,8 @@ class SceneRenderer {
           bb = bb + (tb - bb) * ta;
         }
         final br = node.brightness;
-        final packed = 0xFF000000 |
+        final packed =
+            0xFF000000 |
             (((rr * br).clamp(0.0, 1.0) * 255).toInt() << 16) |
             (((gg * br).clamp(0.0, 1.0) * 255).toInt() << 8) |
             ((bb * br).clamp(0.0, 1.0) * 255).toInt();
@@ -283,7 +335,8 @@ class SceneRenderer {
           _glowPos[gi + 5] = _p2[1];
           final gc = _glowCount * 3;
           final glowA = (emis * 0.55).clamp(0.0, 0.85);
-          final gp = ((glowA * 255).toInt() << 24) |
+          final gp =
+              ((glowA * 255).toInt() << 24) |
               (((baseR * 0.85 + 0.15).clamp(0.0, 1.0) * 255).toInt() << 16) |
               (((baseG * 0.85 + 0.15).clamp(0.0, 1.0) * 255).toInt() << 8) |
               ((baseB * 0.85 + 0.15).clamp(0.0, 1.0) * 255).toInt();
@@ -322,16 +375,22 @@ class SceneRenderer {
       sortedCol[cd + 2] = _col[cs + 2];
     }
 
-    final vertices =
-        Vertices.raw(VertexMode.triangles, sortedPos, colors: sortedCol);
+    final vertices = Vertices.raw(
+      VertexMode.triangles,
+      sortedPos,
+      colors: sortedCol,
+    );
     canvas.drawVertices(vertices, BlendMode.srcOver, Paint());
     vertices.dispose();
 
     if (_glowCount > 0) {
       final gp = Float32List.sublistView(_glowPos, 0, _glowCount * 6);
       final gc = Int32List.sublistView(_glowCol, 0, _glowCount * 3);
-      final glowVerts = Vertices.raw(VertexMode.triangles,
-          Float32List.fromList(gp), colors: Int32List.fromList(gc));
+      final glowVerts = Vertices.raw(
+        VertexMode.triangles,
+        Float32List.fromList(gp),
+        colors: Int32List.fromList(gc),
+      );
       canvas.drawVertices(
         glowVerts,
         BlendMode.srcOver,
@@ -362,7 +421,9 @@ class SceneRenderer {
       if (fade <= 0.02) continue;
       final ground = Vector3(n.position.x, planeY + 0.01, n.position.z);
       final centre = camera.project(ground);
-      if (centre == null) return;
+      // Skip this node, not the whole pass -- one node behind the eye must
+      // not cost every other node its shadow.
+      if (centre == null) continue;
       final r = n.mesh.boundingRadius * n.scale;
       final edge = camera.project(Vector3(ground.x + r, ground.y, ground.z));
       if (edge == null) continue;

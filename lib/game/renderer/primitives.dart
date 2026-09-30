@@ -51,10 +51,10 @@ class Primitives {
   static MeshData shard(double size, Color colour, math.Random rng) {
     final b = MeshBuilder([material(colour, name: 'shard')]);
     Vector3 j(double x, double y, double z) => Vector3(
-          x * size * (0.6 + rng.nextDouble() * 0.8),
-          y * size * (0.6 + rng.nextDouble() * 0.8),
-          z * size * (0.6 + rng.nextDouble() * 0.8),
-        );
+      x * size * (0.6 + rng.nextDouble() * 0.8),
+      y * size * (0.6 + rng.nextDouble() * 0.8),
+      z * size * (0.6 + rng.nextDouble() * 0.8),
+    );
     final a = j(0, 1, 0);
     final c = j(-0.9, -0.5, 0.6);
     final d = j(0.9, -0.5, 0.6);
@@ -67,8 +67,12 @@ class Primitives {
   }
 
   /// Low-poly UV sphere. [segments] x [rings] quads, flat shaded.
-  static MeshData sphere(double radius, Color colour,
-      {int segments = 10, int rings = 6}) {
+  static MeshData sphere(
+    double radius,
+    Color colour, {
+    int segments = 10,
+    int rings = 6,
+  }) {
     final b = MeshBuilder([material(colour, name: 'sphere')]);
     Vector3 at(int s, int r) {
       final theta = math.pi * r / rings;

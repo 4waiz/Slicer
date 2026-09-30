@@ -43,8 +43,9 @@ class GlbLoader {
       final end = start + len;
       if (end > bytes.length) break;
       if (type == _chunkJson) {
-        gltf = json.decode(utf8.decode(bytes.sublist(start, end)))
-            as Map<String, dynamic>;
+        gltf =
+            json.decode(utf8.decode(bytes.sublist(start, end)))
+                as Map<String, dynamic>;
       } else if (type == _chunkBin) {
         bin = Uint8List.sublistView(bytes, start, end);
       }
@@ -74,7 +75,8 @@ class _Reader {
     final sceneIndex = (gltf['scene'] as int?) ?? 0;
     List<dynamic> roots;
     if (scenes.isNotEmpty && sceneIndex < scenes.length) {
-      roots = ((scenes[sceneIndex] as Map)['nodes'] as List<dynamic>?) ?? const [];
+      roots =
+          ((scenes[sceneIndex] as Map)['nodes'] as List<dynamic>?) ?? const [];
     } else {
       roots = List<int>.generate(nodes.length, (i) => i);
     }
@@ -115,8 +117,7 @@ class _Reader {
     final s = node['scale'] as List<dynamic>?;
     final out = Matrix4.identity();
     if (t != null) {
-      out.setTranslation(
-          Vector3(_d(t[0]), _d(t[1]), _d(t[2])));
+      out.setTranslation(Vector3(_d(t[0]), _d(t[1]), _d(t[2])));
     }
     if (r != null) {
       // glTF quaternion order is (x, y, z, w).
@@ -135,7 +136,8 @@ class _Reader {
     final meshes = _list('meshes');
     if (meshIndex >= meshes.length) return;
     final prims =
-        ((meshes[meshIndex] as Map)['primitives'] as List<dynamic>?) ?? const [];
+        ((meshes[meshIndex] as Map)['primitives'] as List<dynamic>?) ??
+        const [];
 
     for (final p in prims) {
       final prim = p as Map<String, dynamic>;
@@ -194,33 +196,42 @@ class _Reader {
         ),
       ];
     }
-    return raw.map((m) {
-      final mm = m as Map<String, dynamic>;
-      final pbr = mm['pbrMetallicRoughness'] as Map<String, dynamic>?;
-      final bcf = pbr?['baseColorFactor'] as List<dynamic>?;
-      // glTF baseColorFactor is linear; the renderer works in display sRGB.
-      final base = bcf != null && bcf.length >= 3
-          ? _linearToSrgb(_d(bcf[0]), _d(bcf[1]), _d(bcf[2]))
-          : const Color(0xFF9FB4C4);
-      final emissive = mm['emissiveFactor'] as List<dynamic>?;
-      var emission = 0.0;
-      if (emissive != null && emissive.length >= 3) {
-        emission = math.max(_d(emissive[0]),
-            math.max(_d(emissive[1]), _d(emissive[2])));
-      }
-      return SurfaceMaterial(
-        name: (mm['name'] as String?) ?? 'material',
-        base: base,
-        interior: SurfaceMaterial.deriveInterior(base),
-        metallic: pbr?['metallicFactor'] == null
-            ? 1.0
-            : _d(pbr!['metallicFactor']),
-        roughness: pbr?['roughnessFactor'] == null
-            ? 0.5
-            : _d(pbr!['roughnessFactor']),
-        emission: emission,
-      );
-    }).toList(growable: false);
+    return raw
+        .map((m) {
+          final mm = m as Map<String, dynamic>;
+          final pbr = mm['pbrMetallicRoughness'] as Map<String, dynamic>?;
+          final bcf = pbr?['baseColorFactor'] as List<dynamic>?;
+          // glTF baseColorFactor is linear; the renderer works in display sRGB.
+          final base = bcf != null && bcf.length >= 3
+              ? _linearToSrgb(_d(bcf[0]), _d(bcf[1]), _d(bcf[2]))
+              : const Color(0xFF9FB4C4);
+          final emissive = mm['emissiveFactor'] as List<dynamic>?;
+          var emission = 0.0;
+          if (emissive != null && emissive.length >= 3) {
+            emission = math.max(
+              _d(emissive[0]),
+              math.max(_d(emissive[1]), _d(emissive[2])),
+            );
+            // Blender's emission strengths are authored for a physically-based
+            // renderer. Taken at face value here they saturate every channel and
+            // glowing pads read as flat white, so scale into a range that still
+            // blooms but keeps the colour identity.
+            emission *= 0.42;
+          }
+          return SurfaceMaterial(
+            name: (mm['name'] as String?) ?? 'material',
+            base: base,
+            interior: SurfaceMaterial.deriveInterior(base),
+            metallic: pbr?['metallicFactor'] == null
+                ? 1.0
+                : _d(pbr!['metallicFactor']),
+            roughness: pbr?['roughnessFactor'] == null
+                ? 0.5
+                : _d(pbr!['roughnessFactor']),
+            emission: emission,
+          );
+        })
+        .toList(growable: false);
   }
 
   static Color _linearToSrgb(double r, double g, double b) {
@@ -240,7 +251,9 @@ class _Reader {
       _list('accessors')[i] as Map<String, dynamic>;
 
   ({ByteData data, int stride, int offset}) _view(
-      Map<String, dynamic> acc, int elementSize) {
+    Map<String, dynamic> acc,
+    int elementSize,
+  ) {
     final bvIndex = acc['bufferView'] as int?;
     final accOffset = (acc['byteOffset'] as int?) ?? 0;
     if (bvIndex == null || bin == null) {

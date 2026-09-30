@@ -91,8 +91,10 @@ void main() {
     });
 
     test('diagonal cut conserves volume and produces a larger cut face', () {
-      final plane =
-          CutPlane.throughPoint(Vector3(1, 1, 0).normalized(), Vector3.zero());
+      final plane = CutPlane.throughPoint(
+        Vector3(1, 1, 0).normalized(),
+        Vector3.zero(),
+      );
       final r = MeshSlicer.slice(cube, plane);
       expect(r.didCut, isTrue);
       expect(r.front!.volume + r.back!.volume, closeTo(8.0, 1e-3));
@@ -121,15 +123,54 @@ void main() {
       expect(second.didCut, isTrue);
       expect(second.front!.volume, closeTo(2.0, 1e-4));
       expect(second.back!.volume, closeTo(2.0, 1e-4));
-      expect(second.front!.materials.length, first.front!.materials.length,
-          reason: 'interior variants must be reused, not appended again');
+      expect(
+        second.front!.materials.length,
+        first.front!.materials.length,
+        reason: 'interior variants must be reused, not appended again',
+      );
+    });
+
+    test('a piece can be sliced repeatedly through its own cut faces', () {
+      // Every material index must stay inside the list however many times a
+      // piece is re-cut: a cut that runs through a previous cut face makes an
+      // interior material dominant, and offsetting that again overflows.
+      var mesh = Primitives.box(Vector3(2, 2, 2), _cyan);
+      final planes = [
+        CutPlane.throughPoint(Vector3(0, 1, 0), Vector3.zero()),
+        CutPlane.throughPoint(Vector3(1, 0, 0), Vector3(0.1, 0.5, 0)),
+        CutPlane.throughPoint(Vector3(0, 0, 1), Vector3(0.5, 0.5, 0.1)),
+        CutPlane.throughPoint(
+          Vector3(1, 1, 1).normalized(),
+          Vector3(0.5, 0.5, 0.5),
+        ),
+      ];
+      for (final plane in planes) {
+        final r = MeshSlicer.slice(mesh, plane);
+        if (!r.didCut) continue;
+        mesh = r.front!;
+        expect(
+          mesh.materials.length,
+          2,
+          reason: 'the material list must not grow with each cut',
+        );
+        for (final m in mesh.triMat) {
+          expect(
+            m,
+            lessThan(mesh.materials.length),
+            reason: 'material index out of range after re-slice',
+          );
+        }
+        expect(mesh.volume, greaterThan(0));
+      }
     });
 
     test('sphere cut conserves volume (many straddling triangles)', () {
       final sphere = Primitives.sphere(1.0, _cyan, segments: 16, rings: 10);
       final before = sphere.volume;
-      final plane =
-          CutPlane.throughPoint(Vector3(0.2, 1, 0.1).normalized(), Vector3(0, 0.15, 0));
+      final plane = CutPlane.throughPoint(
+        Vector3(0.2, 1, 0.1).normalized(),
+        Vector3(0, 0.15, 0),
+      );
       final r = MeshSlicer.slice(sphere, plane);
       expect(r.didCut, isTrue);
       expect(r.front!.volume + r.back!.volume, closeTo(before, 1e-3));
@@ -144,9 +185,15 @@ void main() {
         for (var t = 0; t < m.triCount; t++) {
           final i = t * 9;
           b.addRaw(
-            m.positions[i] + dx, m.positions[i + 1], m.positions[i + 2],
-            m.positions[i + 3] + dx, m.positions[i + 4], m.positions[i + 5],
-            m.positions[i + 6] + dx, m.positions[i + 7], m.positions[i + 8],
+            m.positions[i] + dx,
+            m.positions[i + 1],
+            m.positions[i + 2],
+            m.positions[i + 3] + dx,
+            m.positions[i + 4],
+            m.positions[i + 5],
+            m.positions[i + 6] + dx,
+            m.positions[i + 7],
+            m.positions[i + 8],
             0,
           );
         }
@@ -166,8 +213,10 @@ void main() {
     });
 
     test('cut loop points all lie on the plane', () {
-      final plane =
-          CutPlane.throughPoint(Vector3(0.4, 1, -0.2).normalized(), Vector3(0, 0.1, 0));
+      final plane = CutPlane.throughPoint(
+        Vector3(0.4, 1, -0.2).normalized(),
+        Vector3(0, 0.1, 0),
+      );
       final r = MeshSlicer.slice(cube, plane);
       expect(r.loops, isNotEmpty);
       for (final loop in r.loops) {
@@ -191,9 +240,15 @@ void main() {
       for (var t = 0; t < box.triCount; t++) {
         final i = t * 9;
         b.addRaw(
-          box.positions[i] + 5, box.positions[i + 1], box.positions[i + 2],
-          box.positions[i + 3] + 5, box.positions[i + 4], box.positions[i + 5],
-          box.positions[i + 6] + 5, box.positions[i + 7], box.positions[i + 8],
+          box.positions[i] + 5,
+          box.positions[i + 1],
+          box.positions[i + 2],
+          box.positions[i + 3] + 5,
+          box.positions[i + 4],
+          box.positions[i + 5],
+          box.positions[i + 6] + 5,
+          box.positions[i + 7],
+          box.positions[i + 8],
           0,
         );
       }

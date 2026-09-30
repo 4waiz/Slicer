@@ -28,8 +28,12 @@ class SliceResult {
 
   bool get didCut => front != null && back != null;
 
-  static const SliceResult miss =
-      SliceResult(front: null, back: null, loops: [], cutArea: 0);
+  static const SliceResult miss = SliceResult(
+    front: null,
+    back: null,
+    loops: [],
+    cutArea: 0,
+  );
 }
 
 /// Runtime mesh slicing: splits a triangle soup by a plane and caps the hole
@@ -131,7 +135,8 @@ class MeshSlicer {
         // A vertex lying on the plane *is* a cut point; no edge crossing is
         // generated for it, so record it explicitly.
         if (da.abs() <= epsilon) cross.add(a.clone());
-        if ((da > epsilon && db < -epsilon) || (da < -epsilon && db > epsilon)) {
+        if ((da > epsilon && db < -epsilon) ||
+            (da < -epsilon && db > epsilon)) {
           final ip = plane.intersect(a, b, da, db);
           fPoly.add(ip);
           bPoly.add(ip.clone());
@@ -174,7 +179,8 @@ class MeshSlicer {
   /// upper half of the list; re-slicing must reuse them rather than append a
   /// second copy, otherwise repeated cuts grow the list without bound.
   static (List<SurfaceMaterial>, int) _materialsWithInteriors(
-      List<SurfaceMaterial> src) {
+    List<SurfaceMaterial> src,
+  ) {
     final half = src.length ~/ 2;
     if (half > 0 && src.length.isEven) {
       var alreadyExtended = true;
@@ -189,14 +195,16 @@ class MeshSlicer {
 
     final out = List<SurfaceMaterial>.from(src);
     for (final m in src) {
-      out.add(SurfaceMaterial(
-        name: '${m.name}#cut',
-        base: m.interior,
-        interior: m.interior,
-        metallic: m.metallic * 0.4,
-        roughness: math.min(1.0, m.roughness + 0.15),
-        emission: math.max(m.emission, 0.35),
-      ));
+      out.add(
+        SurfaceMaterial(
+          name: '${m.name}#cut',
+          base: m.interior,
+          interior: m.interior,
+          metallic: m.metallic * 0.4,
+          roughness: math.min(1.0, m.roughness + 0.15),
+          emission: math.max(m.emission, 0.35),
+        ),
+      );
     }
     return (out, src.length);
   }
@@ -204,7 +212,10 @@ class MeshSlicer {
   // -- loop extraction -----------------------------------------------------
 
   static List<_CutLoop> _buildLoops(
-      List<Vector3> a, List<Vector3> b, List<int> mats) {
+    List<Vector3> a,
+    List<Vector3> b,
+    List<int> mats,
+  ) {
     if (a.isEmpty) return const [];
 
     // Weld endpoints onto a coarse grid so shared triangle edges collapse.
@@ -285,10 +296,9 @@ class MeshSlicer {
           dominant = m;
         }
       });
-      loops.add(_CutLoop(
-        chain.map((i) => verts[i]).toList(growable: false),
-        dominant,
-      ));
+      loops.add(
+        _CutLoop(chain.map((i) => verts[i]).toList(growable: false), dominant),
+      );
     }
     return loops;
   }
@@ -306,18 +316,20 @@ class MeshSlicer {
 
   /// Triangulates one cut loop and emits it into both halves with opposite
   /// winding. Returns the area added.
-  static double _capLoop(_CutLoop loop, CutPlane plane, MeshBuilder front,
-      MeshBuilder back, int interiorOffset) {
+  static double _capLoop(
+    _CutLoop loop,
+    CutPlane plane,
+    MeshBuilder front,
+    MeshBuilder back,
+    int interiorOffset,
+  ) {
     final pts = loop.points;
     if (pts.length < 3) return 0;
 
     final (u, v) = plane.basis();
     final origin = pts.first;
     final flat = pts
-        .map((p) => Vector2(
-              (p - origin).dot(u),
-              (p - origin).dot(v),
-            ))
+        .map((p) => Vector2((p - origin).dot(u), (p - origin).dot(v)))
         .toList(growable: false);
 
     var area = _signedArea(flat);
@@ -331,7 +343,15 @@ class MeshSlicer {
     }
 
     final tris = _earClip(poly);
-    final mat = interiorOffset + loop.material;
+
+    // Map the loop's material to its interior variant. On a re-slice the
+    // dominant material can itself already be an interior one (the cut passed
+    // through a previous cut face), and blindly adding the offset again would
+    // index past the end of the list -- a crash on any second cut.
+    final base = loop.material >= interiorOffset
+        ? loop.material - interiorOffset
+        : loop.material;
+    final mat = interiorOffset + base;
 
     for (var i = 0; i + 2 < tris.length; i += 3) {
       final a = poly3[tris[i]];

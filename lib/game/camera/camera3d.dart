@@ -16,8 +16,8 @@ class Camera3D {
     this.fovY = 0.62,
     this.near = 0.1,
     this.far = 120.0,
-  })  : position = position ?? Vector3(0, 3.4, 9.0),
-        target = target ?? Vector3.zero() {
+  }) : position = position ?? Vector3(0, 3.4, 9.0),
+       target = target ?? Vector3.zero() {
     _rebuild();
   }
 
@@ -66,8 +66,9 @@ class Camera3D {
     _forward.normalize();
 
     // Guard against a degenerate basis when looking straight up or down.
-    final worldUp =
-        _forward.y.abs() > 0.999 ? Vector3(0, 0, 1) : Vector3(0, 1, 0);
+    final worldUp = _forward.y.abs() > 0.999
+        ? Vector3(0, 0, 1)
+        : Vector3(0, 1, 0);
     _right
       ..setFrom(_forward.cross(worldUp))
       ..normalize();
@@ -133,7 +134,11 @@ class Camera3D {
   /// containing the eye and both edge rays, so this is exact rather than an
   /// approximation: the cut lands precisely where the player drew it.
   /// Returns null for a swipe too short to define a direction.
-  CutPlane? planeFromSwipe(Offset start, Offset end, {double minPixels = 24.0}) {
+  CutPlane? planeFromSwipe(
+    Offset start,
+    Offset end, {
+    double minPixels = 24.0,
+  }) {
     if ((end - start).distance < minPixels) return null;
     final r1 = rayThrough(start);
     final r2 = rayThrough(end);

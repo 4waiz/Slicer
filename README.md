@@ -1,17 +1,136 @@
-# kanban_slicer
+# Kanban Slicer
 
-A new Flutter project.
+**Cut Through Complexity**
 
-## Getting Started
+A one-swipe 3D physics slicing puzzle for Android. A structure hangs above a
+row of glowing target pads. You get one look, one swipe, and the blade splits
+it for real — an actual runtime mesh cut, with new interior faces, fresh
+colliders, and rigid-body physics carrying each half toward the pad it belongs
+in.
 
-This project is a starting point for a Flutter application.
+Landscape. One finger. Twenty to sixty seconds a level.
 
-A few resources to get you started if this is your first Flutter project:
+---
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Status
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+| | |
+| --- | --- |
+| Worlds / levels | 6 / 60, all validated |
+| 3D assets | 53 GLB models, 11,324 triangles total, procedurally authored in Blender |
+| Audio | 19 original SFX, synthesised from oscillators (250 KB) |
+| Tests | 67 passing (`flutter test`) |
+| Static analysis | clean (`flutter analyze`) |
+| Debug APK | `build/app/outputs/flutter-apk/app-debug.apk` |
+| Release APK | `build/app/outputs/flutter-apk/app-release.apk` (47.0 MB) |
+| Release AAB | `build/app/outputs/bundle/release/app-release.aab` (47.3 MB) |
+| Verified on | Android emulator (API 36, 2400×1080 landscape), release build, 60 FPS |
+
+---
+
+## Running it
+
+```bash
+flutter pub get
+```
+
+```bash
+flutter run -d <device>
+```
+
+Regenerate derived assets (only needed after changing the Blender scripts or
+the audio synth):
+
+```bash
+python tool/gen_manifest.py
+```
+
+```bash
+dart run tool/gen_audio.dart
+```
+
+Builds:
+
+```bash
+flutter build apk --release
+```
+
+```bash
+flutter build appbundle --release
+```
+
+---
+
+## How it works
+
+The interesting part is that nothing about the slice is faked.
+
+1. **Swipe → plane.** The set of world points that project onto a screen line
+   is exactly the plane through the camera containing both edge rays, so the
+   cut plane is `normalize(ray(start) × ray(end))` through the eye. Exact, not
+   approximated — tests assert points along the swipe lie on that plane to 1e-6.
+2. **Plane → geometry.** Each triangle is classified and clipped; the shared
+   edges are welded into closed loops, flattened into the plane's 2D basis and
+   ear-clipped into a cap that is emitted into both halves with opposite
+   winding. Cut faces get a brighter, auto-derived interior material.
+3. **Geometry → physics.** Each half is recentred on its own centroid and its
+   collider is rebuilt from its own vertices — so the new cut corners become
+   contact points automatically, and a piece can be sliced again.
+4. **Physics → score.** Pieces settle on pads; each is matched to a zone by its
+   dominant material *by surface area*, and accuracy, stars and coins follow.
+
+Correctness is checked by volume conservation: `MeshData.volume` uses the
+divergence theorem, which only yields the right answer if the cap actually
+sealed the halves.
+
+See [docs/renderer_decision.md](docs/renderer_decision.md) for why this is a
+custom Dart engine on `Canvas.drawVertices` rather than an off-the-shelf 3D
+package.
+
+---
+
+## Layout
+
+```
+lib/
+  app/            application shell and routing
+  core/           audio, haptics, persistence, monetization
+  game/
+    camera/       perspective camera + swipe-to-plane
+    cosmetics/    blade skins
+    effects/      sparks, flashes, cut glow, confetti
+    levels/       level model, 60-level campaign, generators, validator
+    materials/    the seven material kinds and their physics
+    physics/      fixed-step impulse solver
+    renderer/     mesh, GLB loader, scene renderer, model cache
+    scoring/      zone matching, stars, missions
+    slicing/      cut plane + runtime mesh slicer
+  features/       home, gameplay, level select, daily, endless, missions,
+                  shop, settings
+  shared/         design system and shared widgets
+art/blender/      the scripts that generate every 3D asset and 2D render
+assets/           models, audio, images
+tool/             asset + audio generators
+docs/             design, pipeline, testing, performance, release
+```
+
+---
+
+## Documentation
+
+- [Game design](docs/game_design.md)
+- [Renderer & slicing decision](docs/renderer_decision.md)
+- [Blender pipeline](docs/blender_pipeline.md)
+- [Asset manifest](docs/asset_manifest.md)
+- [Level design](docs/level_design.md)
+- [Testing report](docs/testing_report.md)
+- [Performance report](docs/performance_report.md)
+- [Play Store release](docs/play_store_release.md)
+- [Known limitations](docs/known_limitations.md)
+
+---
+
+## Credits
+
+All 3D assets, 2D renders and audio are original and generated by the scripts
+in this repository. No third-party art, models or sound are used.

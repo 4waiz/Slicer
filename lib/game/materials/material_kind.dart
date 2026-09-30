@@ -15,35 +15,35 @@ enum MaterialKind {
   explosiveCore;
 
   static MaterialKind parse(String? s) => switch (s) {
-        'crystal' => MaterialKind.crystal,
-        'jelly' => MaterialKind.jelly,
-        'fruit' => MaterialKind.fruit,
-        'plastic' || 'plasticToy' || 'toy' => MaterialKind.plasticToy,
-        'metal' => MaterialKind.metal,
-        'ice' => MaterialKind.ice,
-        'explosive' || 'explosiveCore' => MaterialKind.explosiveCore,
-        _ => MaterialKind.crystal,
-      };
+    'crystal' => MaterialKind.crystal,
+    'jelly' => MaterialKind.jelly,
+    'fruit' => MaterialKind.fruit,
+    'plastic' || 'plasticToy' || 'toy' => MaterialKind.plasticToy,
+    'metal' => MaterialKind.metal,
+    'ice' => MaterialKind.ice,
+    'explosive' || 'explosiveCore' => MaterialKind.explosiveCore,
+    _ => MaterialKind.crystal,
+  };
 
   String get id => switch (this) {
-        MaterialKind.crystal => 'crystal',
-        MaterialKind.jelly => 'jelly',
-        MaterialKind.fruit => 'fruit',
-        MaterialKind.plasticToy => 'plastic',
-        MaterialKind.metal => 'metal',
-        MaterialKind.ice => 'ice',
-        MaterialKind.explosiveCore => 'explosive',
-      };
+    MaterialKind.crystal => 'crystal',
+    MaterialKind.jelly => 'jelly',
+    MaterialKind.fruit => 'fruit',
+    MaterialKind.plasticToy => 'plastic',
+    MaterialKind.metal => 'metal',
+    MaterialKind.ice => 'ice',
+    MaterialKind.explosiveCore => 'explosive',
+  };
 
   String get label => switch (this) {
-        MaterialKind.crystal => 'CRYSTAL',
-        MaterialKind.jelly => 'JELLY',
-        MaterialKind.fruit => 'FRUIT',
-        MaterialKind.plasticToy => 'PLASTIC',
-        MaterialKind.metal => 'METAL',
-        MaterialKind.ice => 'ICE',
-        MaterialKind.explosiveCore => 'CORE',
-      };
+    MaterialKind.crystal => 'CRYSTAL',
+    MaterialKind.jelly => 'JELLY',
+    MaterialKind.fruit => 'FRUIT',
+    MaterialKind.plasticToy => 'PLASTIC',
+    MaterialKind.metal => 'METAL',
+    MaterialKind.ice => 'ICE',
+    MaterialKind.explosiveCore => 'CORE',
+  };
 
   MaterialProfile get profile => _profiles[this]!;
 }
@@ -62,6 +62,9 @@ class MaterialProfile {
     required this.sparkColor,
     required this.cutSound,
     required this.separationImpulse,
+    this.fuseSeconds = 0.0,
+    this.blastRadius = 0.0,
+    this.blastImpulse = 0.0,
   });
 
   /// Bounciness on landing, 0..1.
@@ -86,6 +89,19 @@ class MaterialProfile {
 
   /// How hard the two halves push apart at the moment of the cut.
   final double separationImpulse;
+
+  /// Explosive cores only: how long after being freed by a cut the core arms
+  /// and then goes off. Zero means the material is inert.
+  final double fuseSeconds;
+
+  /// Radius of the shove, in world units.
+  final double blastRadius;
+
+  /// Impulse delivered at the centre of the blast, falling off to zero at
+  /// the rim. Applied through inverse mass, so heavy metal resists it.
+  final double blastImpulse;
+
+  bool get isExplosive => fuseSeconds > 0 && blastRadius > 0;
 }
 
 const Map<MaterialKind, MaterialProfile> _profiles = {
@@ -100,7 +116,7 @@ const Map<MaterialKind, MaterialProfile> _profiles = {
     shardSize: 0.10,
     sparkColor: Color(0xFF9BEBFF),
     cutSound: 'cut_crystal',
-    separationImpulse: 1.25,
+    separationImpulse: 2.3,
   ),
   MaterialKind.jelly: MaterialProfile(
     restitution: 0.52,
@@ -113,7 +129,7 @@ const Map<MaterialKind, MaterialProfile> _profiles = {
     shardSize: 0.13,
     sparkColor: Color(0xFFFF9BE0),
     cutSound: 'cut_jelly',
-    separationImpulse: 0.85,
+    separationImpulse: 1.9,
   ),
   MaterialKind.fruit: MaterialProfile(
     restitution: 0.22,
@@ -126,7 +142,7 @@ const Map<MaterialKind, MaterialProfile> _profiles = {
     shardSize: 0.09,
     sparkColor: Color(0xFFFFC46B),
     cutSound: 'cut_fruit',
-    separationImpulse: 1.0,
+    separationImpulse: 2.1,
   ),
   MaterialKind.plasticToy: MaterialProfile(
     restitution: 0.34,
@@ -139,7 +155,7 @@ const Map<MaterialKind, MaterialProfile> _profiles = {
     shardSize: 0.11,
     sparkColor: Color(0xFFFFE28A),
     cutSound: 'cut_plastic',
-    separationImpulse: 1.1,
+    separationImpulse: 2.2,
   ),
   MaterialKind.metal: MaterialProfile(
     restitution: 0.12,
@@ -152,7 +168,7 @@ const Map<MaterialKind, MaterialProfile> _profiles = {
     shardSize: 0.08,
     sparkColor: Color(0xFFFFD48A),
     cutSound: 'cut_metal',
-    separationImpulse: 0.95,
+    separationImpulse: 1.9,
   ),
   MaterialKind.ice: MaterialProfile(
     restitution: 0.2,
@@ -165,7 +181,7 @@ const Map<MaterialKind, MaterialProfile> _profiles = {
     shardSize: 0.09,
     sparkColor: Color(0xFFDFF6FF),
     cutSound: 'cut_ice',
-    separationImpulse: 1.15,
+    separationImpulse: 2.4,
   ),
   MaterialKind.explosiveCore: MaterialProfile(
     restitution: 0.3,
@@ -178,6 +194,11 @@ const Map<MaterialKind, MaterialProfile> _profiles = {
     shardSize: 0.12,
     sparkColor: Color(0xFFFF7A4A),
     cutSound: 'cut_metal',
-    separationImpulse: 1.0,
+    separationImpulse: 2.1,
+    // Long enough to read the warning ring and see where pieces are heading,
+    // short enough that the player is still watching the cut they just made.
+    fuseSeconds: 1.15,
+    blastRadius: 3.4,
+    blastImpulse: 3.6,
   ),
 };
